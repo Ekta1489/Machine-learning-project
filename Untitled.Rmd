@@ -26,6 +26,8 @@ library(earth)
 library(dplyr)
 library(naniar)
 library(bnstruct)
+library(corrplot)
+library(logisticPCA)
 ```
 Reading the Datasets 
 
@@ -35,7 +37,8 @@ read_csv('./data/Diagnosis.csv')
 Prognosis = 
   read_csv('./data/Prognosis.csv')
 Breast_Cancer = 
-  read_csv('./data/Breast_Cancer.csv') #,col_names = ['',])
+  read_csv(file = './data/Breast_Cancer.csv' ,col_names = c('id_number','Clump_thickness','Uniformity_of_Cell_Size','Uniformity','Marginal_Adhesion','Epithelial_Cell_Size','Bare_Nuclei','Bland_Chromatin','Normal_Nucleoli','Mitoses','Class_cancer')) 
+  
 ```
 
 
@@ -49,6 +52,42 @@ Breast_Cancer <- knn.impute(as.matrix(Breast_Cancer), k = 10, cat.var = 2:ncol(B
   to.impute = 1:nrow(Breast_Cancer), using = 1:nrow(Breast_Cancer))
 ```
 
+```{r}
+Breast_Cancer <- data.frame(Breast_Cancer)
+```
+
+```{r}
+
+Breast_Cancer$Class_cancer = ifelse(Breast_Cancer$Class_cancer == 4, 1,0)
+Breast_Cancer = Breast_Cancer[,2:11]
+```
+
+```{r}
+x = model.matrix(Class_cancer~., Breast_Cancer) [,-1]
+
+corrplot(cor(x))
+```
+
+
+```{r}
+
+lpca = cv.lpca(Breast_Cancer[,1:9], ks = 2, ms = 1:10)
+```
+
+
+```{r}
+plot(lpca)
+```
+
+```{r}
+cancer.pca <- prcomp(Breast_Cancer[,1:9],center = TRUE , scale. = TRUE)
+```
+```{r}
+summary(cancer.pca)
+```
+```{r}
+cancer.pca[2]
+```
 
 
 
