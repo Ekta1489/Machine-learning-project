@@ -1,5 +1,5 @@
 ---
-title: "P8106_Mtp"
+title: "Midterm Project"
 author: "Ekta Chaudhary"
 date: "26/03/2020"
 output: pdf_document
@@ -34,7 +34,8 @@ library(mlbench)
 library(pROC)
 library(AppliedPredictiveModeling)
 ```
-Reading the Datasets 
+
+Reading the Datasets. Adding the column names to the Breast_Cancer dataset.  
 
 ```{r}
 Diagnosis = 
@@ -42,14 +43,13 @@ read_csv('./data/Diagnosis.csv')
 Prognosis = 
   read_csv('./data/Prognosis.csv')
 Breast_Cancer = 
-  read_csv(file = './data/Breast_Cancer.csv' ,col_names = c('id_number','Clump_thickness','Uniformity_of_Cell_Size','Uniformity','Marginal_Adhesion','Epithelial_Cell_Size','Bare_Nuclei','Bland_Chromatin','Normal_Nucleoli','Mitoses','Class_cancer')) 
-  
+  read_csv(file = './data/Breast_Cancer.csv' ,col_names = c('id_number','Clump_thickness','Uniformity_of_Cell_Size','Uniformity_of_Cell_Shape','Marginal_Adhesion','Epithelial_Cell_Size','Bare_Nuclei','Bland_Chromatin','Normal_Nucleoli','Mitoses','Class_cancer'))
 ```
 
+Replacing the missing observations that are denoted by a ? with na and then using KNN imputation to impute the missing values.
 
 ```{r}
 Breast_Cancer = Breast_Cancer %>% replace_with_na_all(condition = ~.x == '?')
-
 ```
 
 ```{r}
@@ -57,23 +57,29 @@ Breast_Cancer <- knn.impute(as.matrix(Breast_Cancer), k = 10, cat.var = 2:ncol(B
   to.impute = 1:nrow(Breast_Cancer), using = 1:nrow(Breast_Cancer))
 ```
 
+
+Creating a data frame called Breast_Cancer.
+
 ```{r}
 Breast_Cancer <- data.frame(Breast_Cancer)
 ```
 
-```{r}
+Using ifelse on the column Class_cancer --> If Class_cancer = 4 then it's malignant, else its benign.
+Converted the Class_cancer into factors.
 
+```{r}
 Breast_Cancer$Class_cancer = as.factor(ifelse(Breast_Cancer$Class_cancer == 4, 'mal','benign'))
 Breast_Cancer = Breast_Cancer[,2:11]
 ```
 
+Creating a correlation plot to check the correlation between the variables.
+
 ```{r}
 x = model.matrix(Class_cancer~., Breast_Cancer) [,-1]
-
 corrplot(cor(x))
 ```
 
-
+Here we are diving the data into training and test data.
 
 ```{r}
 set.seed(1)
@@ -82,6 +88,7 @@ rowTrain <- createDataPartition(y = Breast_Cancer$Class_cancer,
                                 list = FALSE)
 ```
 
+Logistic Regression:
 ```{r}
 glm.fit <- glm(Class_cancer~., 
                data = Breast_Cancer, 
@@ -91,47 +98,44 @@ glm.fit <- glm(Class_cancer~.,
 contrasts(Breast_Cancer$Class_cancer)
 ```
 
+We first consider the Bayes classifier (cutoff 0.5) and evaluate its performance on the test data and then plot the test ROC curve.
 
 ```{r}
 test.pred.prob  <- predict(glm.fit, newdata = Breast_Cancer[-rowTrain,1:9],
                            type = "response")
 test.pred <- rep("benign", length(test.pred.prob))
-test.pred[test.pred.prob>0.5] <- "mal"
+test.pred[test.pred.prob > 0.5] <- "mal"
 
 roc.glm <- roc(Breast_Cancer$Class_cancer[-rowTrain], test.pred.prob)
 plot(roc.glm, legacy.axes = TRUE, print.auc = TRUE)
 plot(smooth(roc.glm), col = 4, add = TRUE)
 ```
 
+We can also fit a logistic regression using caret. This is to compare the cross-valiation performance with other models, rather than tuning the model.
 
 ```{r}
 ctrl <- trainControl(method = "repeatedcv",
                      repeats = 5,
                      summaryFunction = twoClassSummary,
                      classProbs = TRUE)
-
 ```
 
-
 ```{r}
-
 set.seed(1)
 model.glm <- train(x = Breast_Cancer[rowTrain,1:9],
                   y = Breast_Cancer$Class_cancer[rowTrain],
                    method = "glm",
                    metric = "ROC",
                    trControl = ctrl)
-
 ```
 
 ```{r}
 coef(glm.fit)
 ```
 
-
+Regularized logistic regression can be fitted using `glmnet'. We use the `train` function to select the optimal tuning parameters.
 
 ```{r}
-
 glmnGrid <- expand.grid(.alpha = seq(0, 1, length = 4),
                         .lambda = exp(seq(-4, -2, length = 20)))
 
@@ -147,24 +151,15 @@ model.glmn <- train(x = Breast_Cancer[rowTrain,1:9],
 plot(model.glmn, xTrans = function(x) log(x))   
 
 model.glmn$bestTune
-
 ```
-
-
-
 
 ```{r}
 test.pred.prob  <- predict(model.glmn, x = Breast_Cancer[-rowTrain,1:9],
                       method = "glmnet")
-
 ```
 
+Here we use the function `lda` in library `MASS` to conduct LDA.
 
-## Discriminant analysis
-
-### LDA
-
-We use the function `lda` in library `MASS` to conduct LDA.
 ```{r}
 library(MASS)
 
@@ -173,7 +168,8 @@ lda.fit <- lda(Class_cancer~., data = Breast_Cancer,
 plot(lda.fit)
 ```
 
-Evaluate the test set performance using ROC.
+Here we are evaluating the test set performance using ROC.
+
 ```{r}
 lda.pred <- predict(lda.fit, newdata = Breast_Cancer[-rowTrain,])
 head(lda.pred$posterior)
@@ -194,10 +190,7 @@ model.lda <- train(x = Breast_Cancer[rowTrain,1:9],
                    trControl = ctrl)
 ```
 
-#KNN
-
-
-
+Using KNN:
 
 ```{r, warning=FALSE}
 set.seed(1)
@@ -205,21 +198,20 @@ model.knn <- train(x = Breast_Cancer[rowTrain,1:9],
                    y = Breast_Cancer$Class_cancer[rowTrain],
                    method = "knn",
                    preProcess = c("center","scale"),
-                   tuneGrid = data.frame(k = seq(1,50,by =5)),
+                   tuneGrid = data.frame(k = seq(1,50,by = 5)),
                    trControl = ctrl)
 
 ggplot(model.knn)
 ```
+# GLM, Regularized GLM and LDA have relatively good performance.
 
-
-
-
-GLM, Regularized GLM and LDA have relatively good performance.
 ```{r}
 res <- resamples(list(GLM = model.glm, GLMNET = model.glmn, 
                       LDA = model.lda, KNN = model.knn))
 summary(res)
 ```
+Now looking at the test set performance.
+
 ```{r, warning=FALSE}
 lda.pred <- predict(model.lda, newdata = Breast_Cancer[-rowTrain,], type = "prob")[,2]
 glm.pred <- predict(model.glm, newdata = Breast_Cancer[-rowTrain,], type = "prob")[,2]
