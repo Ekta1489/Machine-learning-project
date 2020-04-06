@@ -33,15 +33,12 @@ library(e1071)
 library(mlbench)
 library(pROC)
 library(AppliedPredictiveModeling)
+library(ggplot2)
 ```
 
-Reading the Datasets. Adding the column names to the Breast_Cancer dataset.  
+Reading the Dataset. Adding the column names to the Breast_Cancer dataset.  
 
 ```{r}
-Diagnosis = 
-read_csv('./data/Diagnosis.csv')
-Prognosis = 
-  read_csv('./data/Prognosis.csv')
 Breast_Cancer = 
   read_csv(file = './data/Breast_Cancer.csv' ,col_names = c('id_number','Clump_thickness','Uniformity_of_Cell_Size','Uniformity_of_Cell_Shape','Marginal_Adhesion','Epithelial_Cell_Size','Bare_Nuclei','Bland_Chromatin','Normal_Nucleoli','Mitoses','Class_cancer'))
 ```
@@ -57,11 +54,12 @@ Breast_Cancer <- knn.impute(as.matrix(Breast_Cancer), k = 10, cat.var = 2:ncol(B
   to.impute = 1:nrow(Breast_Cancer), using = 1:nrow(Breast_Cancer))
 ```
 
-
-Creating a data frame called Breast_Cancer.
+Creating a data frame called Breast_Cancer. The str method will allows us to know the data type of each variable. As we can see the data type of all the columns is numeric. The column Class_cancer takes two values: 2 for benign and 4 for malignant.
 
 ```{r}
 Breast_Cancer <- data.frame(Breast_Cancer)
+dim(Breast_Cancer)
+str(Breast_Cancer)
 ```
 
 Using ifelse on the column Class_cancer --> If Class_cancer = 4 then it's malignant, else its benign.
@@ -69,7 +67,12 @@ Converted the Class_cancer into factors.
 
 ```{r}
 Breast_Cancer$Class_cancer = as.factor(ifelse(Breast_Cancer$Class_cancer == 4, 'mal','benign'))
+
 Breast_Cancer = Breast_Cancer[,2:11]
+```
+
+```{r}
+str(Breast_Cancer)
 ```
 
 Creating a correlation plot to check the correlation between the variables.
@@ -88,7 +91,7 @@ rowTrain <- createDataPartition(y = Breast_Cancer$Class_cancer,
                                 list = FALSE)
 ```
 
-Logistic Regression:
+Logistic Regression using GLM:
 ```{r}
 glm.fit <- glm(Class_cancer~., 
                data = Breast_Cancer, 
@@ -98,7 +101,7 @@ glm.fit <- glm(Class_cancer~.,
 contrasts(Breast_Cancer$Class_cancer)
 ```
 
-We first consider the Bayes classifier (cutoff 0.5) and evaluate its performance on the test data and then plot the test ROC curve.
+Evaluating the performance on the test data and then plotting the test ROC curve.
 
 ```{r}
 test.pred.prob  <- predict(glm.fit, newdata = Breast_Cancer[-rowTrain,1:9],
@@ -111,7 +114,7 @@ plot(roc.glm, legacy.axes = TRUE, print.auc = TRUE)
 plot(smooth(roc.glm), col = 4, add = TRUE)
 ```
 
-We can also fit a logistic regression using caret. This is to compare the cross-valiation performance with other models, rather than tuning the model.
+We can also fit a logistic regression using caret. This is to get the best performance using  cross-valiation.
 
 ```{r}
 ctrl <- trainControl(method = "repeatedcv",
@@ -131,6 +134,9 @@ model.glm <- train(x = Breast_Cancer[rowTrain,1:9],
 
 ```{r}
 coef(glm.fit)
+```
+```{r}
+summary(glm.fit)$coefficients
 ```
 
 Regularized logistic regression can be fitted using `glmnet'. We use the `train` function to select the optimal tuning parameters.
@@ -203,7 +209,7 @@ model.knn <- train(x = Breast_Cancer[rowTrain,1:9],
 
 ggplot(model.knn)
 ```
-# GLM, Regularized GLM and LDA have relatively good performance.
+# GLMNET and LDA have relatively good performance.
 
 ```{r}
 res <- resamples(list(GLM = model.glm, GLMNET = model.glmn, 
